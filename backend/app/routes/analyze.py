@@ -173,9 +173,15 @@ async def analyze_stream(request: AnalysisRequest):
                 "progress": 98, "validation": validation,
             })
 
-            # Done
+            # Done — pass full results
             yield format_sse("complete", "completed", {
-                "message": "Analysis complete!", "progress": 100,
+                "message": "Analysis complete!",
+                "progress": 100,
+                "findings": findings,
+                "topic_clusters": topics,
+                "prd": prd_data,
+                "test_cases": tests,
+                "validation": validation,
             })
 
         except Exception as e:

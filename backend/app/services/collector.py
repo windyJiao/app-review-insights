@@ -94,11 +94,12 @@ async def collect_reviews(
                 return [], warnings
 
             reviews = _parse_reviews_from_html(response.text)
-
-            # Limit to max_reviews
             reviews = reviews[:max_reviews]
-
             logger.info(f"Extracted {len(reviews)} reviews from page HTML")
+
+            for r in reviews:
+                logger.info(f"  [{r['rating']}★] {r['title']} — {r['content'][:80]}...")
+
             if not reviews:
                 warnings.append("No review data found in page HTML.")
 
