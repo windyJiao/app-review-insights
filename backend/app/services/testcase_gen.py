@@ -77,7 +77,15 @@ async def generate_test_cases(
     if not all_requirements:
         return []
 
+    review_count = len(reviews)
+    if review_count < 20:
+        max_hint = "Generate at most 8 tests TOTAL. 1-2 tests per requirement. Keep it minimal."
+    else:
+        max_hint = "Generate 1-3 tests per requirement."
+
     prompt = f"""Generate test cases for each requirement. Each test must trace to user reviews.
+
+{max_hint}
 
 Requirements:
 {json.dumps(all_requirements, indent=2)}
@@ -91,19 +99,11 @@ Findings context:
     "supporting_excerpts": f.get("supporting_excerpts", []),
 } for i, f in enumerate(findings)], indent=2)}
 
-Generate tests that:
-1. Verify each requirement is correctly implemented
-2. Include functional, edge case, and regression tests
-3. Have clear preconditions, steps, and expected results
-4. Link to the requirement (linked_req_id = req_index)
-5. Link to original review IDs that motivated the requirement
-6. Are practical and executable by a QA tester
-
 Rules:
-- 1-4 tests per requirement
-- Every test must have linked_review_ids
+- Every test MUST have linked_review_ids from real reviews
+- If a requirement has no real review evidence, generate at most 1 test for it
 - Test steps must be specific and actionable
-- Consider the original user complaint when designing edge cases"""
+- Focus on what users actually complained about, not theoretical edge cases"""
 
     try:
         lang_inst = "Please respond in Simplified Chinese (简体中文)." if lang == "zh" else ""

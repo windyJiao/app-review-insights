@@ -72,7 +72,7 @@ def validate_traceability(
 
                 if not valid_f and not req.get("is_assumption"):
                     req["is_assumption"] = True
-                    req["assumption_rationale"] = "No valid finding evidence found."
+                    req["assumption_rationale"] = "此需求缺乏直接评论证据，属于 AI 推断。"
                     revised_findings.append({
                         "req": req.get("title", f"req-{j}"),
                         "change": "Marked as assumption (no finding traceability)",

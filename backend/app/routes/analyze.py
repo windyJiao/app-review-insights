@@ -177,6 +177,8 @@ async def analyze_stream(request: AnalysisRequest):
             yield format_sse("complete", "completed", {
                 "message": "Analysis complete!",
                 "progress": 100,
+                "cleaned_reviews": active,
+                "cleaning_stats": stats,
                 "findings": findings,
                 "topic_clusters": topics,
                 "prd": prd_data,

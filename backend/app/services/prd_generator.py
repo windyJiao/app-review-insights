@@ -94,30 +94,31 @@ async def generate_prd(
 
     topic_names = [t["topic_name"] for t in topics]
     goal_context = f"\nPrimary analysis goal: {goal}" if goal else ""
+    review_count = len(reviews)
+
+    # Adapt scope to data size
+    if review_count < 20:
+        version_hint = "Generate exactly 1 version with 2-4 requirements. Be concise."
+    elif review_count < 50:
+        version_hint = "Generate 1-2 versions with 3-6 requirements total."
+    else:
+        version_hint = "Generate up to 3 versions."
 
     prompt = f"""Generate a PRD for "{app_name}" based on user review findings.{goal_context}
 
 App ID: {app_id}
-Total reviews: {len(reviews)}
+Total reviews: {review_count}
 Topics: {', '.join(topic_names)}
+{version_hint}
 
 Findings:
 {json.dumps(findings, indent=2)}
 
-Generate a PRD with:
-1. Executive summary of user sentiment and key issues
-2. 1-3 versions split by priority:
-   - V1: Critical bugs, crashes, P0 issues
-   - V2: High-impact UX improvements, evidenced feature requests
-   - V3: Nice-to-haves, polish, thin-evidence items
-3. Each requirement must cite source finding IDs
-4. Mark unsupported requirements as assumptions with rationale
-5. Include data limitations and caveats
-
 Rules:
-- Every requirement links to source findings
+- Every requirement links to source finding IDs
+- <5 supporting reviews for a finding -> mark requirement as assumption
 - Don't invent features nobody asked for
-- If evidence is insufficient, note it
+- If data is too thin for meaningful requirements, say so
 - Mark is_assumption=true when not directly evidenced"""
 
     try:

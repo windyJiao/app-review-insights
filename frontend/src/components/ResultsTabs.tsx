@@ -92,33 +92,65 @@ function Overview({ events, data }: Props) {
 
 function ReviewsTab({ data, events }: Props) {
   const { tr } = useTr();
-  const stats = events.find((e) => e.stats)?.stats as Record<string, number> | undefined;
-  if (!stats) return <p className="text-sm text-gray-500">{tr('reviews.noData')}</p>;
+  const stats = data.cleaning_stats as Record<string, number> | undefined
+    || events.find((e) => e.stats)?.stats as Record<string, number> | undefined;
+  const reviews = (data.cleaned_reviews || []) as Record<string, unknown>[];
+
   return (
-    <div className="bg-white rounded-lg border p-5">
-      <h3 className="font-semibold mb-4">{tr('reviews.title')}</h3>
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <Stat label={tr('reviews.totalRaw')} value={stats.total_raw} />
-        <Stat label={tr('reviews.cleaned')} value={stats.total_cleaned} />
-        <Stat label={tr('reviews.kept')} value={stats.total_kept} />
-        <Stat label={tr('reviews.duplicates')} value={stats.duplicates_removed} />
-      </div>
-      {stats.rating_distribution && (
-        <div>
-          <h4 className="text-sm font-medium mb-3">{tr('reviews.ratingDist')}</h4>
-          <div className="space-y-2">
-            {Object.entries(stats.rating_distribution as Record<string, number>).sort(([a], [b]) => Number(b) - Number(a)).map(([r, c]) => {
-              const total = Object.values(stats.rating_distribution as Record<string, number>).reduce((a, b) => a + b, 0);
-              return (
-                <div key={r} className="flex items-center gap-3">
-                  <span className="text-sm w-16">{'⭐'.repeat(Number(r))}</span>
-                  <div className="flex-1 bg-gray-100 rounded-full h-5"><div className="bg-yellow-400 h-5 rounded-full" style={{ width: `${total > 0 ? (c / total) * 100 : 0}%` }} /></div>
-                  <span className="text-sm text-gray-600 w-12 text-right">{c}</span>
+    <div className="space-y-4">
+      {stats && (
+        <div className="bg-white rounded-lg border p-5">
+          <h3 className="font-semibold mb-4">{tr('reviews.title')}</h3>
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            <Stat label={tr('reviews.totalRaw')} value={stats.total_raw} />
+            <Stat label={tr('reviews.cleaned')} value={stats.total_cleaned} />
+            <Stat label={tr('reviews.kept')} value={stats.total_kept} />
+            <Stat label={tr('reviews.duplicates')} value={stats.duplicates_removed} />
+          </div>
+          {stats.rating_distribution && (
+            <div>
+              <h4 className="text-sm font-medium mb-3">{tr('reviews.ratingDist')}</h4>
+              <div className="space-y-2">
+                {Object.entries(stats.rating_distribution as Record<string, number>).sort(([a], [b]) => Number(b) - Number(a)).map(([r, c]) => {
+                  const total = Object.values(stats.rating_distribution as Record<string, number>).reduce((a, b) => a + b, 0);
+                  return (
+                    <div key={r} className="flex items-center gap-3">
+                      <span className="text-sm w-16">{'⭐'.repeat(Number(r))}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-5"><div className="bg-yellow-400 h-5 rounded-full" style={{ width: `${total > 0 ? (c / total) * 100 : 0}%` }} /></div>
+                      <span className="text-sm text-gray-600 w-12 text-right">{c}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {reviews.length > 0 && (
+        <div className="bg-white rounded-lg border p-5">
+          <h3 className="font-semibold mb-4">📝 {tr('tab.reviews')} ({reviews.length})</h3>
+          <div className="space-y-3">
+            {reviews.map((r, i) => (
+              <div key={i} className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <span className="font-medium text-sm">{r.title as string}</span>
+                    <span className="ml-2">{'⭐'.repeat(r.rating as number)}</span>
+                  </div>
+                  <div className="flex gap-2 text-xs text-gray-400">
+                    <span>{r.author as string}</span>
+                    <span>{r.date as string}</span>
+                    {(r.version as string) && <span>v{r.version as string}</span>}
+                  </div>
                 </div>
-              );
-            })}
+                <p className="text-sm text-gray-700 whitespace-pre-line">{r.content as string}</p>
+              </div>
+            ))}
           </div>
         </div>
+      )}
+      {!stats && reviews.length === 0 && (
+        <p className="text-sm text-gray-500">{tr('reviews.noData')}</p>
       )}
     </div>
   );
@@ -264,8 +296,8 @@ function TestsTab({ data }: { data: Record<string, unknown> }) {
             <div className="flex justify-between mb-2">
               <h4 className="font-medium text-sm">{tc.title as string}</h4>
               <div className="flex gap-1">
-                <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800">{tc.test_type as string}</span>
-                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs ${tc.priority === 'P0' ? 'bg-red-100 text-red-800' : 'bg-gray-100'}`}>{tc.priority as string}</span>
+                <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800">{tr(`testType.${tc.test_type}`)}</span>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs ${tc.priority === 'P0' ? 'bg-red-100 text-red-800' : 'bg-gray-100'}`}>{tr(`priority.${tc.priority}`)}</span>
               </div>
             </div>
             <p className="text-xs text-gray-600 mb-3">{tc.description as string}</p>
@@ -294,40 +326,51 @@ function TraceTab({ data }: { data: Record<string, unknown> }) {
   const { tr } = useTr();
   const v = data.validation as Record<string, unknown> | undefined;
   if (!v) return <p className="text-sm text-gray-500">{tr('trace.noData')}</p>;
+
+  const totalFindings = (v.total_findings as number) || 0;
+  const totalReqs = (v.total_requirements as number) || 0;
+  const totalTests = (v.total_tests as number) || 0;
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg border p-5">
-        <h3 className="font-semibold mb-4">{tr('trace.title')}</h3>
-        <div className="grid grid-cols-4 gap-3">
+        <h3 className="font-semibold mb-3">{tr('trace.title')}</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          从 {totalFindings} 条结论 → {totalReqs} 个需求 → {totalTests} 个测试，每步都需要评论支撑。
+          {totalFindings < 3 && ' 当前评论量偏少，大部分需求为 AI 推测，已标注。'}
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Stat label={tr('trace.findingsWithSupport')} value={v.findings_with_support as number} />
           <Stat label={tr('trace.withoutSupport')} value={v.findings_without_support as number} warn />
           <Stat label={tr('trace.fullyTraced')} value={v.requirements_fully_traced as number} />
           <Stat label={tr('trace.orphanTests')} value={v.orphan_tests as number} warn />
         </div>
       </div>
+      {(v.marked_assumptions as string[])?.length > 0 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <h4 className="font-medium text-purple-800 mb-1">{tr('trace.assumptions')}</h4>
+          <p className="text-xs text-purple-600 mb-2">以下需求缺乏直接评论支撑，是 AI 根据趋势推测的：</p>
+          {(v.marked_assumptions as string[]).map((a, i) => <p key={i} className="text-sm text-purple-700">🔮 {a}</p>)}
+        </div>
+      )}
       {(v.issues as string[])?.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <h4 className="font-medium text-red-800">{tr('trace.issues')}</h4>
           {(v.issues as string[]).map((iss, i) => <p key={i} className="text-sm text-red-700">{iss}</p>)}
         </div>
       )}
-      {(v.marked_assumptions as string[])?.length > 0 && (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <h4 className="font-medium text-purple-800">{tr('trace.assumptions')}</h4>
-          {(v.marked_assumptions as string[]).map((a, i) => <p key={i} className="text-sm text-purple-700">{a}</p>)}
+      <div className="bg-white rounded-lg border p-5">
+        <h4 className="font-medium text-sm mb-3">数据溯源链</h4>
+        <div className="flex items-center justify-center gap-2 text-xs py-3 flex-wrap">
+          <span className="px-3 py-1.5 bg-blue-50 rounded border font-bold text-blue-700">💬 评论</span>
+          <span className="text-gray-300">→</span>
+          <span className="px-3 py-1.5 bg-green-50 rounded border font-bold text-green-700">🔍 结论</span>
+          <span className="text-gray-300">→</span>
+          <span className="px-3 py-1.5 bg-purple-50 rounded border font-bold text-purple-700">📋 需求</span>
+          <span className="text-gray-300">→</span>
+          <span className="px-3 py-1.5 bg-orange-50 rounded border font-bold text-orange-700">✅ 测试</span>
         </div>
-      )}
-      <div className="bg-white rounded-lg border p-5 text-center">
-        <div className="flex items-center justify-center gap-4 text-sm py-4">
-          <div className="p-3 bg-blue-50 rounded border font-bold text-blue-700">Reviews</div>
-          <span className="text-2xl text-gray-300">→</span>
-          <div className="p-3 bg-green-50 rounded border font-bold text-green-700">Findings</div>
-          <span className="text-2xl text-gray-300">→</span>
-          <div className="p-3 bg-purple-50 rounded border font-bold text-purple-700">Requirements</div>
-          <span className="text-2xl text-gray-300">→</span>
-          <div className="p-3 bg-orange-50 rounded border font-bold text-orange-700">Test Cases</div>
-        </div>
-        <p className="text-xs text-gray-400">{tr('trace.flowText')}</p>
+        <p className="text-xs text-gray-400 mt-3 text-center">{tr('trace.flowText')}</p>
       </div>
     </div>
   );
