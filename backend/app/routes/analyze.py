@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from starlette.responses import StreamingResponse
 
 from ..models.schemas import AnalysisRequest
-from ..services.collector import collect_reviews, extract_app_id
+from ..services.collector import collect_reviews, extract_app_id, extract_country
 from ..services.cleaner import clean_reviews
 from ..services.classifier import discover_topics
 from ..services.analyzer import analyze_findings
@@ -48,8 +48,9 @@ async def analyze_stream(request: AnalysisRequest):
                 return
 
             app_name = f"App {app_id}"
+            country = extract_country(request.app_url)
             raw_reviews, warnings = await collect_reviews(
-                request.app_url, max_reviews=request.max_reviews
+                request.app_url, country=country, max_reviews=request.max_reviews
             )
 
             yield format_sse("collect", "completed", {

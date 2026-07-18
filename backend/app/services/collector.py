@@ -1,77 +1,65 @@
-"""App Store RSS feed review collector.
+"""App Store review collector.
 
-Data source: Apple's official iTunes RSS feed (not page scraping).
-Endpoint: https://itunes.apple.com/{country}/rss/customerreviews/id{app_id}/xml
-
-Limitations:
-- Max ~10 pages, ~50 reviews per page (~500 total)
-- Only most recent reviews are available
-- XML format (JSON endpoint doesn't support pagination)
-- Rate limits: no documented limit, but use with reasonable delays
+Extracts review data embedded in the App Store product page HTML.
+Apple embeds review JSON objects in the page source for initial render.
 """
 
 import re
-import httpx
-import xml.etree.ElementTree as ET
-from typing import Optional
+import json
+import asyncio
 import logging
+from typing import Optional
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
 
 def extract_app_id(url: str) -> Optional[str]:
-    """Extract numeric app ID from an App Store URL."""
     match = re.search(r'/id(\d{5,})(?:\?|$)', url)
     return match.group(1) if match else None
 
 
-def parse_review_entry(entry: ET.Element) -> Optional[dict]:
-    """Parse a single review entry from the RSS feed XML."""
-    ns = {
-        'atom': 'http://www.w3.org/2005/Atom',
-        'im': 'http://itunes.apple.com/rss',
-    }
+def extract_country(url: str) -> str:
+    match = re.search(r'apple\.com/([a-z]{2})/', url)
+    return match.group(1) if match else "us"
 
-    try:
-        entry_id = entry.find('atom:id', ns)
-        review_id = entry_id.text.strip() if entry_id is not None and entry_id.text else "unknown"
 
-        rating_el = entry.find('im:rating', ns)
-        rating = int(rating_el.text.strip()) if rating_el is not None and rating_el.text else 0
+def _parse_reviews_from_html(html: str) -> list[dict]:
+    """Extract review objects from the App Store page HTML.
 
-        title_el = entry.find('atom:title', ns)
-        title = title_el.text.strip() if title_el is not None and title_el.text else ""
+    Reviews are embedded as JSON objects with '$kind':'Review' in the page's
+    shelf data, which is rendered server-side for SEO and initial display.
+    """
+    reviews = []
+    seen_ids = set()
 
-        content_els = entry.findall('atom:content', ns)
-        content = ""
-        for c in content_els:
-            if c.get('type') == 'text' and c.text:
-                content = c.text.strip()
-                break
+    # Pattern: find all {"$kind":"Review", ...} JSON objects
+    # These are embedded in the page's shelf/items arrays
+    pattern = r'\{\"\$kind\":\"Review\",\"id\":\"(\d+)\",\"title\":\"(.*?)\",\"date\":\"(.*?)\",\"dateText\":\"[^\"]*\",\"contents\":\"(.*?)\",\"rating\":(\d+),\"reviewerName\":\"(.*?)\"'
 
-        author_el = entry.find('atom:author/atom:name', ns)
-        author = author_el.text.strip() if author_el is not None and author_el.text else "Anonymous"
+    for m in re.finditer(pattern, html, re.DOTALL):
+        review_id = m.group(1)
+        if review_id in seen_ids:
+            continue
+        seen_ids.add(review_id)
 
-        version_el = entry.find('im:version', ns)
-        version = version_el.text.strip() if version_el is not None and version_el.text else None
+        # Unescape JSON strings
+        title = m.group(2).replace('\\"', '"').replace('\\\\', '\\')
+        content = m.group(4).replace('\\"', '"').replace('\\\\', '\\')
+        reviewer = m.group(6).replace('\\"', '"').replace('\\\\', '\\')
 
-        date_str = ""
-        updated_el = entry.find('atom:updated', ns)
-        if updated_el is not None and updated_el.text:
-            date_str = updated_el.text.strip()
-
-        return {
+        reviews.append({
             "id": review_id,
-            "rating": rating,
+            "rating": int(m.group(5)),
             "title": title,
             "content": content,
-            "author": author,
-            "version": version,
-            "date": date_str,
-        }
-    except Exception as e:
-        logger.warning(f"Failed to parse review entry: {e}")
-        return None
+            "author": reviewer,
+            "version": None,
+            "date": m.group(3),
+        })
+
+    return reviews
 
 
 async def collect_reviews(
@@ -79,7 +67,7 @@ async def collect_reviews(
     country: str = "us",
     max_reviews: int = 500,
 ) -> tuple[list[dict], list[str]]:
-    """Collect reviews from the App Store RSS feed.
+    """Collect reviews from the App Store product page.
 
     Returns (reviews, warnings).
     """
@@ -87,51 +75,35 @@ async def collect_reviews(
     if not app_id:
         return [], [f"Could not extract app ID from URL: {app_url}"]
 
-    reviews = []
     warnings = []
-    xml_base = (
-        f"https://itunes.apple.com/{country}/rss/customerreviews"
-        f"/id{app_id}/sortBy=mostRecent/xml"
-    )
+
+    # Build the product page URL
+    page_url = f"https://apps.apple.com/{country}/app/id{app_id}"
+    logger.info(f"Fetching reviews from: {page_url}")
 
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        for page in range(1, 11):
-            if len(reviews) >= max_reviews:
-                break
+        try:
+            response = await client.get(
+                page_url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
+            )
+            if response.status_code != 200:
+                warnings.append(f"HTTP {response.status_code} from {page_url}")
+                return [], warnings
 
-            url = f"{xml_base}?page={page}"
-            try:
-                response = await client.get(url)
-                if response.status_code == 400:
-                    break  # No more pages
-                if response.status_code != 200:
-                    warnings.append(f"Page {page}: HTTP {response.status_code}")
-                    break
+            reviews = _parse_reviews_from_html(response.text)
 
-                root = ET.fromstring(response.text)
-                ns = {'atom': 'http://www.w3.org/2005/Atom'}
-                entries = root.findall('atom:entry', ns)
+            # Limit to max_reviews
+            reviews = reviews[:max_reviews]
 
-                if not entries:
-                    break
+            logger.info(f"Extracted {len(reviews)} reviews from page HTML")
+            if not reviews:
+                warnings.append("No review data found in page HTML.")
 
-                for entry in entries:
-                    if len(reviews) >= max_reviews:
-                        break
-                    parsed = parse_review_entry(entry)
-                    if parsed and parsed["content"]:
-                        reviews.append(parsed)
-
-                logger.info(f"Page {page}: {len(entries)} entries, total: {len(reviews)}")
-
-            except ET.ParseError as e:
-                warnings.append(f"Page {page}: XML parse error: {e}")
-                break
-            except httpx.TimeoutException:
-                warnings.append(f"Page {page}: Request timeout")
-                break
-
-    if len(reviews) >= max_reviews:
-        warnings.append(f"Reached max review limit ({max_reviews}).")
+        except Exception as e:
+            warnings.append(f"Fetch error: {e}")
+            return [], warnings
 
     return reviews, warnings
