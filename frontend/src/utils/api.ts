@@ -4,6 +4,7 @@ export interface AnalysisParams {
   app_url: string;
   goal?: string;
   max_reviews: number;
+  lang?: string;
 }
 
 export function startAnalysis(

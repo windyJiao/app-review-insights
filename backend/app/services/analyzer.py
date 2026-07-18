@@ -98,6 +98,7 @@ async def analyze_findings(
     topics: list[dict],
     reviews: list[dict],
     goal: str | None = None,
+    lang: str = "en",
 ) -> list[dict]:
     """Generate evidence-grounded findings from topic clusters."""
     if not topics or not reviews:
@@ -148,8 +149,9 @@ Topics:
 {json.dumps(topic_summaries, indent=2)}"""
 
     try:
+        lang_inst = "Please respond in Simplified Chinese (简体中文)." if lang == "zh" else ""
         result = await structured_completion(
-            system_prompt="Senior product analyst. Generate findings grounded in evidence. Never fabricate data. Distinguish between what data shows and what you infer. When evidence is thin, say so.",
+            system_prompt=f"Senior product analyst. Generate findings grounded in evidence. Never fabricate data. Distinguish between what data shows and what you infer. When evidence is thin, say so. {lang_inst}",
             user_message=prompt,
             json_schema=FINDINGS_SCHEMA,
             temperature=0.2,

@@ -28,6 +28,7 @@ class AnalysisRequest(BaseModel):
         description="Analysis goal or constraint"
     )
     max_reviews: int = Field(default=500, ge=50, le=1000)
+    lang: str = Field(default="en", description="Output language: 'en' or 'zh'")
 
 
 class RawReview(BaseModel):

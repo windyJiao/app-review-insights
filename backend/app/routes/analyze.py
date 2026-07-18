@@ -89,7 +89,7 @@ async def analyze_stream(request: AnalysisRequest):
             })
 
             try:
-                topics = await discover_topics(active, request.goal)
+                topics = await discover_topics(active, request.goal, request.lang)
                 yield format_sse("classify", "completed", {
                     "message": f"Discovered {len(topics)} topics",
                     "progress": 50,
@@ -111,7 +111,7 @@ async def analyze_stream(request: AnalysisRequest):
             })
 
             try:
-                findings = await analyze_findings(topics, active, request.goal)
+                findings = await analyze_findings(topics, active, request.goal, request.lang)
                 yield format_sse("analyze", "completed", {
                     "message": f"{len(findings)} findings generated",
                     "progress": 65,
@@ -133,7 +133,7 @@ async def analyze_stream(request: AnalysisRequest):
             })
 
             try:
-                prd_data = await generate_prd(findings, topics, active, app_name, app_id, request.goal)
+                prd_data = await generate_prd(findings, topics, active, app_name, app_id, request.goal, request.lang)
                 v_count = len(prd_data.get("versions", []))
                 r_count = sum(len(v.get("requirements", [])) for v in prd_data.get("versions", []))
                 yield format_sse("prd", "completed", {
@@ -151,7 +151,7 @@ async def analyze_stream(request: AnalysisRequest):
             })
 
             try:
-                tests = await generate_test_cases(prd_data, findings, active)
+                tests = await generate_test_cases(prd_data, findings, active, request.lang)
                 yield format_sse("tests", "completed", {
                     "message": f"{len(tests)} test cases generated",
                     "progress": 92, "count": len(tests),

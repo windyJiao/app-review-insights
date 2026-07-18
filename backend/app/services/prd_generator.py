@@ -78,6 +78,7 @@ async def generate_prd(
     app_name: str,
     app_id: str,
     goal: str | None = None,
+    lang: str = "en",
 ) -> dict:
     """Generate PRD with version planning from findings."""
     if not findings:
@@ -120,8 +121,9 @@ Rules:
 - Mark is_assumption=true when not directly evidenced"""
 
     try:
+        lang_inst = "Please respond in Simplified Chinese (简体中文)." if lang == "zh" else ""
         result = await structured_completion(
-            system_prompt="Senior product manager creating PRD from user research. Every requirement traceable to evidence. Mark assumptions explicitly.",
+            system_prompt=f"Senior product manager creating PRD from user research. Every requirement traceable to evidence. Mark assumptions explicitly. {lang_inst}",
             user_message=prompt,
             json_schema=PRD_SCHEMA,
             temperature=0.3,

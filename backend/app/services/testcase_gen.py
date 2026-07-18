@@ -59,6 +59,7 @@ async def generate_test_cases(
     prd: dict,
     findings: list[dict],
     reviews: list[dict],
+    lang: str = "en",
 ) -> list[dict]:
     """Generate test cases for each requirement in the PRD."""
     versions = prd.get("versions", [])
@@ -105,8 +106,9 @@ Rules:
 - Consider the original user complaint when designing edge cases"""
 
     try:
+        lang_inst = "Please respond in Simplified Chinese (简体中文)." if lang == "zh" else ""
         result = await structured_completion(
-            system_prompt="QA engineer writing test cases. Each test executable and traceable to user feedback. Clear steps a manual tester can follow.",
+            system_prompt=f"QA engineer writing test cases. Each test executable and traceable to user feedback. Clear steps a manual tester can follow. {lang_inst}",
             user_message=prompt,
             json_schema=TEST_CASES_SCHEMA,
             temperature=0.2,

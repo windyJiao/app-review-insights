@@ -100,6 +100,7 @@ TOPIC_MERGE_SCHEMA = {
 async def discover_topics(
     reviews: list[dict],
     goal: str | None = None,
+    lang: str = "en",
     batch_size: int = 100,
 ) -> list[dict]:
     """Discover topics from reviews using LLM, batching if needed."""
@@ -133,8 +134,9 @@ Reviews:
 {chr(10).join(review_lines)}"""
 
         try:
+            lang_inst = "Please respond in Simplified Chinese (简体中文)." if lang == "zh" else ""
             result = await structured_completion(
-                system_prompt="You are a product analyst identifying themes in user feedback. Be thorough and specific.",
+                system_prompt=f"You are a product analyst identifying themes in user feedback. Be thorough and specific. {lang_inst}",
                 user_message=prompt,
                 json_schema=TOPIC_DISCOVERY_SCHEMA,
                 temperature=0.3,
@@ -151,13 +153,13 @@ Reviews:
 
     # Merge overlapping topics across batches
     if len(all_topics) > 5:
-        merged = await _merge_topics(all_topics, goal)
+        merged = await _merge_topics(all_topics, goal, lang)
         return merged
 
     return all_topics
 
 
-async def _merge_topics(topics: list[dict], goal: str | None) -> list[dict]:
+async def _merge_topics(topics: list[dict], goal: str | None, lang: str = "en") -> list[dict]:
     """Merge overlapping topics via LLM semantic understanding."""
     topics_json = json.dumps([{
         "topic_name": t["topic_name"],
@@ -170,8 +172,9 @@ async def _merge_topics(topics: list[dict], goal: str | None) -> list[dict]:
     goal_context = f"\nAnalysis goal: {goal}" if goal else ""
 
     try:
+        lang_inst = "Please respond in Simplified Chinese (简体中文)." if lang == "zh" else ""
         result = await structured_completion(
-            system_prompt="Merge overlapping topics from app store review analysis. Combine semantically identical topics.",
+            system_prompt=f"Merge overlapping topics from app store review analysis. Combine semantically identical topics. {lang_inst}",
             user_message=f"""Merge overlapping topics. Combine those describing the same issue.
 Target 5-15 well-defined, specific topics.{goal_context}
 

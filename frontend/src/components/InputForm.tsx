@@ -2,20 +2,21 @@ import { useState } from 'react';
 import { useTr } from '../i18n/LanguageContext';
 
 interface Props {
-  onStart: (p: { app_url: string; goal?: string; max_reviews: number }) => void;
+  onStart: (p: { app_url: string; goal?: string; max_reviews: number; lang?: string }) => void;
   isRunning: boolean;
+  lang?: string;
 }
 
-export default function InputForm({ onStart, isRunning }: Props) {
+export default function InputForm({ onStart, isRunning, lang }: Props) {
   const { tr } = useTr();
-  const [appUrl, setAppUrl] = useState('https://apps.apple.com/us/app/workout-for-women-home-gym/id839285684');
+  const [appUrl, setAppUrl] = useState('https://apps.apple.com/cn/app/workout-for-women-home-gym/id839285684');
   const [goal, setGoal] = useState('');
   const [maxReviews, setMaxReviews] = useState(200);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!appUrl.trim()) return;
-    onStart({ app_url: appUrl.trim(), goal: goal.trim() || undefined, max_reviews: maxReviews });
+    onStart({ app_url: appUrl.trim(), goal: goal.trim() || undefined, max_reviews: maxReviews, lang });
   };
 
   return (
