@@ -4,13 +4,11 @@ import json
 import logging
 import traceback
 from datetime import datetime, timezone
-from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
 
-from ..models.schemas import AnalysisRequest, AnalysisResult, AnalysisStatus
+from ..models.schemas import AnalysisRequest
 from ..services.collector import collect_reviews, extract_app_id
 from ..services.cleaner import clean_reviews
 from ..services.classifier import discover_topics
@@ -24,13 +22,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def sse_event(stage: str, status: str, data: dict) -> dict:
-    data.update({
-        "stage": stage,
-        "status": status,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
-    return data
+def sse_event(stage: str, status: str, payload: dict) -> dict:
+    """Build an SSE event dict that sse_starlette can handle."""
+    payload["stage"] = stage
+    payload["status"] = status
+    payload["timestamp"] = datetime.now(timezone.utc).isoformat()
+    return {"event": stage, "data": json.dumps(payload, default=str)}
 
 
 @router.post("/analyze")
