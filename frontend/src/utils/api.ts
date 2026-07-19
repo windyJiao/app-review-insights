@@ -51,6 +51,66 @@ export function startAnalysis(
   return controller;
 }
 
+export function importAndAnalyzeStream(
+  file: File,
+  format: 'json' | 'csv',
+  goal?: string,
+  appName?: string,
+  lang?: string,
+  onEvent?: (event: Record<string, unknown>) => void,
+  onError?: (error: Error) => void,
+  onComplete?: () => void,
+): AbortController {
+  const controller = new AbortController();
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('format', format);
+  if (goal) fd.append('goal', goal);
+  if (appName) fd.append('app_name', appName);
+  if (lang) fd.append('lang', lang);
+
+  fetch(`${API_BASE}/import/analyze`, {
+    method: 'POST',
+    body: fd,
+    signal: controller.signal,
+  }).then(async (response) => {
+    if (!response.ok) {
+      const errText = await response.text();
+      let msg = `HTTP ${response.status}`;
+      try { const j = JSON.parse(errText); msg = j.detail || msg; } catch {}
+      onError?.(new Error(msg));
+      onComplete?.();
+      return;
+    }
+    const reader = response.body?.getReader();
+    if (!reader) { onError?.(new Error('No response body')); onComplete?.(); return; }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            onEvent?.(data);
+          } catch { /* skip */ }
+        }
+      }
+    }
+    onComplete?.();
+  }).catch((err) => {
+    if (err.name !== 'AbortError') onError?.(err);
+    onComplete?.();
+  });
+
+  return controller;
+}
+
 export async function importAndAnalyze(
   file: File, format: 'json' | 'csv',
   goal?: string, appName?: string,

@@ -9,7 +9,7 @@ interface Props {
 
 export default function InputForm({ onStart, isRunning, lang }: Props) {
   const { tr } = useTr();
-  const [appUrl, setAppUrl] = useState('https://apps.apple.com/us/app/workout-for-women-home-gym/id839285684');
+  const [appUrl, setAppUrl] = useState('https://apps.apple.com/cn/app/workout-for-women-home-gym/id839285684');
   const [goal, setGoal] = useState('');
   const [maxReviews, setMaxReviews] = useState(200);
 

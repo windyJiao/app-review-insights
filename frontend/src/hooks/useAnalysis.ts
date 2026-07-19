@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { startAnalysis, importAndAnalyze, AnalysisParams } from '../utils/api';
+import { startAnalysis, importAndAnalyzeStream, AnalysisParams } from '../utils/api';
 import type { StageEvent, StageState, AnalysisStage } from '../types';
 
 const STAGES: AnalysisStage[] = [
@@ -64,17 +64,29 @@ export function useAnalysis() {
   }, []);
 
   const importData = useCallback(async (
-    file: File, format: 'json' | 'csv', goal?: string, appName?: string,
+    file: File, format: 'json' | 'csv', goal?: string, appName?: string, lang?: string,
   ) => {
     resetAll();
     setIsRunning(true);
-    try {
-      const r = await importAndAnalyze(file, format, goal, appName);
-      setImportResult(r);
-      setCompleted(true);
-    } catch (err) { setError((err as Error).message); }
-    finally { setIsRunning(false); }
-  }, [resetAll]);
+    setCurrentStage('collect');
+
+    abortRef.current = importAndAnalyzeStream(
+      file, format, goal, appName, lang,
+      (event) => {
+        const evt = event as unknown as StageEvent;
+        setEvents((prev) => [...prev, evt]);
+        const stage = evt.stage as AnalysisStage;
+        if (stage && stage !== 'complete' && stage !== 'error') {
+          setCurrentStage(stage);
+          updateStage(stage, evt.status, evt.message, evt.progress);
+        }
+        if (stage === 'complete') { setCompleted(true); setIsRunning(false); }
+        if (stage === 'error') { setError(evt.message || 'Error'); setIsRunning(false); }
+      },
+      (err) => { setError(err.message); setIsRunning(false); },
+      () => { setIsRunning(false); },
+    );
+  }, [resetAll, updateStage]);
 
   return {
     stages, currentStage, isRunning, events, error,

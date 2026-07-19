@@ -69,7 +69,7 @@ function AppContent() {
 
         {mode === 'analyze'
           ? <InputForm onStart={runAnalysis} isRunning={isRunning} lang={lang} />
-          : <ImportPanel onImport={importData} isRunning={isRunning} />}
+          : <ImportPanel onImport={importData} isRunning={isRunning} lang={lang} />}
 
         {(isRunning || completed) && (
           <ProgressPanel stages={stages} isRunning={isRunning} onCancel={cancelAnalysis} />

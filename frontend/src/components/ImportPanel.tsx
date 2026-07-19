@@ -2,11 +2,12 @@ import { useState, useRef } from 'react';
 import { useTr } from '../i18n/LanguageContext';
 
 interface Props {
-  onImport: (file: File, format: 'json' | 'csv', goal?: string, appName?: string) => Promise<void>;
+  onImport: (file: File, format: 'json' | 'csv', goal?: string, appName?: string, lang?: string) => Promise<void>;
   isRunning: boolean;
+  lang?: string;
 }
 
-export default function ImportPanel({ onImport, isRunning }: Props) {
+export default function ImportPanel({ onImport, isRunning, lang }: Props) {
   const { tr } = useTr();
   const [file, setFile] = useState<File | null>(null);
   const [format, setFormat] = useState<'json' | 'csv'>('json');
@@ -22,7 +23,7 @@ export default function ImportPanel({ onImport, isRunning }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    await onImport(file, format, goal.trim() || undefined, appName.trim() || undefined);
+    await onImport(file, format, goal.trim() || undefined, appName.trim() || undefined, lang);
   };
 
   return (
